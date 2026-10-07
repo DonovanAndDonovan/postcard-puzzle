@@ -1,0 +1,13 @@
+# Postcard Puzzle: a community jigsaw. By Grey Donovan, with Erin. MIT licensed.
+# A Cloudflare Pages site with one tiny Function and its OWN D1 database.
+name = "postcard-puzzle"                 # your Pages project name
+pages_build_output_dir = "site"
+compatibility_date = "2026-06-01"
+
+[vars]
+PIECES = "294"                           # community.cols × community.rows from site/puzzle.config.js
+
+[[d1_databases]]
+binding = "DB"
+database_name = "postcard-puzzle"
+database_id = "PUT-YOUR-D1-DATABASE-ID-HERE"   # from: npx wrangler d1 create postcard-puzzle

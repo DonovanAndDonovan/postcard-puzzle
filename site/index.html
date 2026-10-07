@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<!-- Postcard Puzzle, by Grey Donovan, with Erin. MIT licensed.
+     Everything you'd change lives in puzzle.config.js. The four tags below are
+     the exception: link previews are read before any script runs, so edit them by hand. -->
+<title>The Postcard</title>
+<meta name="description" content="A community jigsaw: every piece anyone places stays placed for everyone.">
+<meta property="og:title" content="The Postcard">
+<meta property="og:description" content="A community jigsaw: every piece anyone places stays placed for everyone.">
+<meta property="og:image" content="postcard.jpg">
+<script src="puzzle.config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1c1512;
+    --bg-2: #271d18;
+    --bar: rgba(28, 21, 18, 0.92);
+    --ink: #f4e9d8;
+    --muted: #c7b497;
+    --accent: #d4552c;
+    --gold: #c9a25a;
+    --line: rgba(244, 233, 216, 0.16);
+    --card: #f4ead9;
+    --card-ink: #3a2a1e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+    padding: 10px 16px; background: var(--bar); border-bottom: 1px solid var(--line); z-index: 2;
+  }
+  .brand { display: flex; flex-direction: column; margin-right: auto; min-width: 0; }
+  .brand h1 { font-family: "Cormorant Garamond", Georgia, serif; font-size: 22px; line-height: 1.1; margin: 0; letter-spacing: 0.3px; }
+  .brand span { font-size: 12px; color: var(--muted); }
+  .progress { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .progress b { color: var(--ink); }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, select {
+    font: 600 12.5px Inter, system-ui, sans-serif; color: var(--ink); background: var(--bg-2);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 12px; cursor: pointer;
+  }
+  button:hover, select:hover { border-color: var(--gold); }
+  button[aria-pressed="true"] { background: var(--gold); color: #24190f; border-color: var(--gold); }
+  main { position: relative; flex: 1; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+  .overlay {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(12, 8, 6, 0.62); padding: 16px; z-index: 3;
+  }
+  .overlay.open { display: flex; }
+  .card {
+    background: var(--card); color: var(--card-ink); max-width: 460px; width: 100%;
+    border-radius: 14px; padding: 26px 26px 22px; box-shadow: 0 18px 60px rgba(0,0,0,.5);
+    border: 1px solid rgba(58, 42, 30, 0.2); text-align: center;
+  }
+  .card h2 { font-family: "Cormorant Garamond", Georgia, serif; font-size: 30px; margin: 0 0 4px; }
+  .card .sub { font-style: italic; font-family: "Cormorant Garamond", Georgia, serif; font-size: 18px; margin: 0 0 14px; color: #6b5440; }
+  .card p { font-size: 14px; line-height: 1.5; margin: 8px 0; }
+  .card .sizes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 16px 0 6px; }
+  .card button { color: var(--card-ink); background: #fffaf1; border-color: rgba(58,42,30,.25); padding: 9px 14px; }
+  .card button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .card small { display: block; color: #7d6650; font-size: 12px; margin-top: 12px; }
+  .card .who { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 0; text-align: left; }
+  .card .who span { font-weight: 400; color: #7d6650; }
+  .card .who input {
+    display: block; width: 100%; margin-top: 6px; padding: 9px 12px; border-radius: 10px;
+    border: 1px solid rgba(58,42,30,.3); background: #fffaf1; color: var(--card-ink); font: 14px Inter, system-ui, sans-serif;
+  }
+  .card .own { font-size: 13px; color: #6b5440; }
+  .card .own button { margin: 4px 2px 0; padding: 6px 10px; font-size: 12px; }
+  #done-helpers { font-family: "Cormorant Garamond", Georgia, serif; font-size: 17px; }
+  .toast {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    background: var(--bar); border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 2; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+  .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }
+  @media (max-width: 560px) {
+    header { padding: 8px 12px; }
+    .brand h1 { font-size: 19px; }
+    .brand span { display: none; }
+    button, select { padding: 6px 10px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1 id="title"></h1>
+    <span id="tagline"></span>
+  </div>
+  <div class="progress" id="progress" aria-live="polite">&nbsp;</div>
+  <div class="controls">
+    <select id="size" aria-label="Which puzzle"></select>
+    <button id="edges" aria-pressed="false" title="Show only edge pieces">Edges</button>
+    <button id="ghost" aria-pressed="false" title="Show a faint copy of the picture on the board">Ghost</button>
+    <button id="scatter" title="Spread the loose pieces out again">Scatter</button>
+    <button id="fit" title="Fit everything on screen">Fit</button>
+    <button id="restart" title="Start this size again">Start over</button>
+  </div>
+</header>
+<main>
+  <canvas id="board" aria-label="Jigsaw puzzle board. Drag pieces onto the board; they snap into place when close."></canvas>
+  <div class="loading" id="loading"></div>
+  <div class="toast" id="toast"></div>
+
+  <div class="overlay" id="intro" role="dialog" aria-labelledby="intro-title">
+    <div class="card">
+      <h2 id="intro-title"></h2>
+      <p class="sub" id="intro-sub"></p>
+      <div id="intro-body"></div>
+      <label class="who"><span id="register-label"></span> <span>(optional)</span>
+        <input id="who" type="text" maxlength="30" autocomplete="nickname">
+      </label>
+      <div class="sizes">
+        <button data-size="community" class="primary" id="join"></button>
+      </div>
+      <p class="own" id="own-sizes">Or build your own copy:</p>
+      <small>Your own copies are saved in this browser, so you can come back to them.</small>
+    </div>
+  </div>
+
+  <div class="overlay" id="done" role="dialog" aria-labelledby="done-title">
+    <div class="card">
+      <h2 id="done-title"></h2>
+      <p class="sub" id="done-sub"></p>
+      <p id="done-helpers" hidden></p>
+      <p id="done-note"></p>
+      <p id="done-motto" hidden style="font-family:'Cormorant Garamond',Georgia,serif;font-style:italic;font-size:17px;margin-top:14px"></p>
+      <div class="sizes">
+        <button id="admire" class="primary">Admire it</button>
+        <button id="another">Try another size</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const CFG = window.PUZZLE;
+  const IMG_SRC = CFG.image;
+  // Grids are keyed 'community' for the shared board, and by piece count for private copies.
+  const GRIDS = { community: [CFG.community.cols, CFG.community.rows] };
+  for (const s of CFG.own) GRIDS[s.cols * s.rows] = [s.cols, s.rows];
+  const STORE = CFG.storePrefix;
+  const COMMUNITY_SEED = CFG.community.seed;   // everyone must get the same cut
+  const API = 'api/board';
+
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const hitCtx = document.createElement('canvas').getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  // ---------- words, from puzzle.config.js ----------
+  (function applyWords() {
+    const el = (tag, text, attrs = {}) => { const e = document.createElement(tag); e.textContent = text; Object.assign(e, attrs); return e; };
+    const communityN = CFG.community.cols * CFG.community.rows;
+    $('title').textContent = CFG.title;
+    $('tagline').textContent = CFG.tagline;
+    $('loading').textContent = CFG.messages.loading;
+    $('intro-title').textContent = CFG.welcome.heading;
+    $('intro-sub').textContent = CFG.welcome.sub;
+    // Welcome paragraphs may carry simple markup (<b>), and they come from your own config file.
+    $('intro-body').innerHTML = CFG.welcome.body.map(p => `<p>${p}</p>`).join('');
+    $('register-label').textContent = CFG.welcome.registerLabel;
+    $('who').placeholder = CFG.welcome.registerPlaceholder;
+    $('join').textContent = `${CFG.emoji} Join the community puzzle · ${communityN}`;
+    const own = $('own-sizes');
+    for (const s of CFG.own) {
+      const n = s.cols * s.rows;
+      const b = el('button', `${n} · ${s.label}`);
+      b.dataset.size = String(n);
+      own.append(' ', b);
+    }
+    const sel = $('size');
+    sel.append(el('option', `${CFG.emoji} Community puzzle`, { value: 'community' }));
+    for (const s of CFG.own) { const n = s.cols * s.rows; sel.append(el('option', `My own · ${n}`, { value: String(n) })); }
+    $('done-title').textContent = CFG.finish.heading;
+    $('done-note').textContent = CFG.finish.note;
+    if (CFG.finish.motto) { $('done-motto').textContent = CFG.finish.motto; $('done-motto').hidden = false; }
+  })();
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode: play on without saving */ } },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
+
+  let img, W, H, cols, rows, N, pw, ph, pad, seed;
+  let mode = 'community';             // 'community' (shared board) | 'own' (this browser only)
+  let pieces = [], order = [];        // order: indices of loose pieces, bottom to top
+  let view = { z: 1, ox: 0, oy: 0 }, minZ = 0.1, maxZ = 4;
+  let edgesOnly = false, ghost = false, dirty = true, finished = false;
+  let cw = 0, ch = 0, dpr = 1;
+
+  // community sync
+  let pending = new Set(), syncing = false, offline = false, lastCount = -1, helpers = [];
+
+  const keyFor = choice => STORE + (choice === 'community' ? 'community' : choice);
+  const currentKey = () => keyFor(mode === 'community' ? 'community' : String(N));
+
+  // ---------- seeded randomness, so the cut stays the same when you come back ----------
+  function rng(s) {
+    return () => {
+      s |= 0; s = s + 0x6D2B79F5 | 0;
+      let t = Math.imul(s ^ s >>> 15, 1 | s);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // ---------- the cut ----------
+  // One edge from A to B. v: 0 flat, 1 tab out, -1 tab in. Traversal is clockwise,
+  // so the outward normal is (uy, -ux).
+  function edge(p, ax, ay, bx, by, v, jit) {
+    if (!v) { p.lineTo(bx, by); return; }
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+    const ux = dx / len, uy = dy / len, nx = uy, ny = -ux;
+    const P = (t, n) => [ax + ux * len * (t + jit) + nx * n * v * len, ay + uy * len * (t + jit) + ny * n * v * len];
+    p.lineTo(...P(0.34, 0));
+    p.bezierCurveTo(...P(0.40, 0.00), ...P(0.43, 0.05), ...P(0.39, 0.10));
+    p.bezierCurveTo(...P(0.33, 0.20), ...P(0.42, 0.27), ...P(0.50, 0.27));
+    p.bezierCurveTo(...P(0.58, 0.27), ...P(0.67, 0.20), ...P(0.61, 0.10));
+    p.bezierCurveTo(...P(0.57, 0.05), ...P(0.60, 0.00), ...P(0.66, 0.00));
+    p.lineTo(bx, by);
+  }
+
+  function build(size, saved) {
+    [cols, rows] = GRIDS[size];
+    N = cols * rows;
+    pw = W / cols; ph = H / rows;
+    pad = Math.ceil(0.3 * Math.max(pw, ph));
+    seed = mode === 'community' ? COMMUNITY_SEED : (saved ? saved.seed : (Math.random() * 1e9) | 0);
+    const rand = rng(seed);
+
+    const vt = [], ht = [], vj = [], hj = [];
+    for (let r = 0; r < rows; r++) {
+      vt[r] = []; ht[r] = []; vj[r] = []; hj[r] = [];
+      for (let c = 0; c < cols; c++) {
+        vt[r][c] = rand() < 0.5 ? 1 : -1; vj[r][c] = (rand() - 0.5) * 0.08;
+        ht[r][c] = rand() < 0.5 ? 1 : -1; hj[r][c] = (rand() - 0.5) * 0.08;
+      }
+    }
+
+    pieces = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        // Tab direction flips between neighbours (one's tab is the other's blank).
+        // Jitter is a POSITION along the shared edge, so it never flips between
+        // neighbours; it only flips sign when an edge is traversed backwards.
+        const top = r === 0 ? 0 : -ht[r - 1][c], topJ = r === 0 ? 0 : hj[r - 1][c];
+        const right = c === cols - 1 ? 0 : vt[r][c], rightJ = c === cols - 1 ? 0 : vj[r][c];
+        const bottom = r === rows - 1 ? 0 : ht[r][c], bottomJ = r === rows - 1 ? 0 : hj[r][c];
+        const left = c === 0 ? 0 : -vt[r][c - 1], leftJ = c === 0 ? 0 : vj[r][c - 1];
+
+        const path = new Path2D();
+        path.moveTo(0, 0);
+        edge(path, 0, 0, pw, 0, top, topJ);
+        edge(path, pw, 0, pw, ph, right, rightJ);
+        // Bottom and left are traversed backwards (clockwise), so their jitter flips sign.
+        edge(path, pw, ph, 0, ph, bottom, -bottomJ);
+        edge(path, 0, ph, 0, 0, left, -leftJ);
+        path.closePath();
+
+        const cv = document.createElement('canvas');
+        cv.width = Math.ceil(pw + 2 * pad); cv.height = Math.ceil(ph + 2 * pad);
+        const g = cv.getContext('2d');
+        g.translate(pad, pad);
+        g.save();
+        g.clip(path);
+        g.drawImage(img, -c * pw, -r * ph);
+        g.lineWidth = 2.5; g.strokeStyle = 'rgba(40, 20, 8, 0.55)'; g.stroke(path);
+        g.translate(-0.8, -0.8);
+        g.lineWidth = 1; g.strokeStyle = 'rgba(255, 245, 225, 0.35)'; g.stroke(path);
+        g.restore();
+
+        pieces.push({
+          r, c, path, canvas: cv,
+          edge: r === 0 || c === 0 || r === rows - 1 || c === cols - 1,
+          x: 0, y: 0, locked: false,
+        });
+      }
+    }
+
+    $('size').value = mode === 'community' ? 'community' : String(N);
+    $('restart').textContent = mode === 'community' ? 'Tidy my table' : 'Start over';
+    finished = false;
+    if (saved && saved.pos && saved.pos.length === N) {
+      saved.pos.forEach(([x, y, l], i) => { pieces[i].x = x; pieces[i].y = y; pieces[i].locked = !!l; });
+      order = (saved.order || []).filter(i => pieces[i] && !pieces[i].locked);
+      pieces.forEach((p, i) => { if (!p.locked && !order.includes(i)) order.push(i); });
+    } else {
+      order = pieces.map((_, i) => i);
+      scatter(rng((Math.random() * 1e9) | 0));
+    }
+    fitView();
+    updateProgress();
+    if (placedCount() === N) finished = true;
+  }
+
+  // ---------- layout ----------
+  function portrait() { return cw < ch * 0.9; }
+
+  function trays() {
+    if (portrait()) {
+      return [{ x: -0.04 * W, y: 1.05 * H, w: 1.08 * W - pw, h: 1.25 * H - ph }];
+    }
+    const top = -0.08 * H, h = 1.5 * H - ph;
+    return [
+      { x: -0.55 * W, y: top, w: 0.5 * W - pw, h },
+      { x: 1.05 * W, y: top, w: 0.5 * W - pw, h },
+      { x: 0, y: 1.05 * H, w: W - pw, h: 0.37 * H - ph },
+    ];
+  }
+
+  function scatter(rand = Math.random) {
+    const ts = trays().filter(t => t.w > 0 && t.h > 0);
+    const total = ts.reduce((s, t) => s + t.w * t.h, 0);
+    const loose = order.slice();
+    for (let k = loose.length - 1; k > 0; k--) {           // shuffle stacking order too
+      const j = Math.floor(rand() * (k + 1)); [loose[k], loose[j]] = [loose[j], loose[k]];
+    }
+    order = loose;
+    for (const i of order) {
+      let pick = rand() * total, t = ts[0];
+      for (const tt of ts) { if ((pick -= tt.w * tt.h) <= 0) { t = tt; break; } }
+      pieces[i].x = t.x + rand() * t.w;
+      pieces[i].y = t.y + rand() * t.h;
+    }
+    dirty = true;
+  }
+
+  function fitView() {
+    let x0 = -0.02 * W, y0 = -0.02 * H, x1 = 1.02 * W, y1 = 1.02 * H;
+    for (const i of order) {
+      const p = pieces[i];
+      x0 = Math.min(x0, p.x - pad); y0 = Math.min(y0, p.y - pad);
+      x1 = Math.max(x1, p.x + pw + pad); y1 = Math.max(y1, p.y + ph + pad);
+    }
+    const z = Math.min(cw / (x1 - x0), ch / (y1 - y0)) * 0.97;
+    view.z = z;
+    view.ox = (cw - (x1 - x0) * z) / 2 - x0 * z;
+    view.oy = (ch - (y1 - y0) * z) / 2 - y0 * z;
+    minZ = z * 0.6; maxZ = Math.max(z * 8, 1.5);
+    dirty = true;
+  }
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    const wasEmpty = !cw;
+    cw = r.width; ch = r.height; dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+    if (!wasEmpty && pieces.length) fitView();
+    dirty = true;
+  }
+
+  // ---------- drawing ----------
+  function draw() {
+    if (dirty && pieces.length) {
+      dirty = false;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.save();
+      ctx.translate(view.ox, view.oy);
+      ctx.scale(view.z, view.z);
+
+      // the board
+      ctx.fillStyle = 'rgba(244, 233, 216, 0.06)';
+      ctx.fillRect(0, 0, W, H);
+      if (ghost) { ctx.globalAlpha = 0.2; ctx.drawImage(img, 0, 0); ctx.globalAlpha = 1; }
+      ctx.lineWidth = 2 / view.z;
+      ctx.strokeStyle = 'rgba(201, 162, 90, 0.55)';
+      ctx.strokeRect(0, 0, W, H);
+
+      for (const p of pieces) if (p.locked) ctx.drawImage(p.canvas, p.x - pad, p.y - pad);
+      for (const i of order) {
+        const p = pieces[i];
+        if (edgesOnly && !p.edge && i !== drag.index) continue;
+        if (i === drag.index) {
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 6;
+          ctx.drawImage(p.canvas, p.x - pad, p.y - pad);
+          ctx.restore();
+        } else {
+          ctx.drawImage(p.canvas, p.x - pad, p.y - pad);
+        }
+      }
+      ctx.restore();
+    }
+    requestAnimationFrame(draw);
+  }
+
+  // ---------- interaction ----------
+  const pointers = new Map();
+  const drag = { index: -1, dx: 0, dy: 0, panning: false, lastX: 0, lastY: 0, pinch: null };
+
+  const toWorld = (sx, sy) => [(sx - view.ox) / view.z, (sy - view.oy) / view.z];
+  const localXY = e => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+  function hit(wx, wy) {
+    for (let k = order.length - 1; k >= 0; k--) {
+      const i = order[k], p = pieces[i];
+      if (edgesOnly && !p.edge) continue;
+      if (wx < p.x - pad || wy < p.y - pad || wx > p.x + pw + pad || wy > p.y + ph + pad) continue;
+      if (hitCtx.isPointInPath(p.path, wx - p.x, wy - p.y)) return i;
+    }
+    return -1;
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* some browsers refuse capture; dragging still works */ }
+    const [sx, sy] = localXY(e);
+    pointers.set(e.pointerId, [sx, sy]);
+
+    if (pointers.size === 2) {                      // pinch: let go of whatever we held
+      dropPiece(false);
+      drag.panning = false;
+      const [[ax, ay], [bx, by]] = [...pointers.values()];
+      drag.pinch = { d: Math.hypot(bx - ax, by - ay), z: view.z, mx: (ax + bx) / 2, my: (ay + by) / 2, ox: view.ox, oy: view.oy };
+      return;
+    }
+    if (pointers.size > 2) return;
+
+    const [wx, wy] = toWorld(sx, sy);
+    const i = hit(wx, wy);
+    if (i >= 0) {
+      drag.index = i;
+      drag.dx = wx - pieces[i].x; drag.dy = wy - pieces[i].y;
+      order.splice(order.indexOf(i), 1); order.push(i);   // bring to top
+      canvas.classList.add('dragging');
+    } else {
+      drag.panning = true;
+      drag.lastX = sx; drag.lastY = sy;
+      canvas.classList.add('dragging');
+    }
+    dirty = true;
+  });
+
+  canvas.addEventListener('pointermove', e => {
+    if (!pointers.has(e.pointerId)) return;
+    const [sx, sy] = localXY(e);
+    pointers.set(e.pointerId, [sx, sy]);
+
+    if (drag.pinch && pointers.size === 2) {
+      const [[ax, ay], [bx, by]] = [...pointers.values()];
+      const d = Math.hypot(bx - ax, by - ay);
+      const z = clamp(drag.pinch.z * d / drag.pinch.d, minZ, maxZ);
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      // keep the world point under the original midpoint under the new midpoint
+      const wx = (drag.pinch.mx - drag.pinch.ox) / drag.pinch.z, wy = (drag.pinch.my - drag.pinch.oy) / drag.pinch.z;
+      view.z = z; view.ox = mx - wx * z; view.oy = my - wy * z;
+      dirty = true;
+      return;
+    }
+    if (drag.index >= 0) {
+      const [wx, wy] = toWorld(sx, sy);
+      pieces[drag.index].x = wx - drag.dx;
+      pieces[drag.index].y = wy - drag.dy;
+      dirty = true;
+    } else if (drag.panning) {
+      view.ox += sx - drag.lastX; view.oy += sy - drag.lastY;
+      drag.lastX = sx; drag.lastY = sy;
+      dirty = true;
+    }
+  });
+
+  function endPointer(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) drag.pinch = null;
+    if (pointers.size === 0) {
+      dropPiece(true);
+      drag.panning = false;
+      canvas.classList.remove('dragging');
+    }
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+
+  function lockPiece(i) {
+    const p = pieces[i];
+    p.x = p.c * pw; p.y = p.r * ph; p.locked = true;
+    const k = order.indexOf(i);
+    if (k >= 0) order.splice(k, 1);
+  }
+
+  function dropPiece(trySnap) {
+    const i = drag.index;
+    if (i < 0) return;
+    drag.index = -1;
+    const p = pieces[i];
+    if (trySnap && !p.locked) {
+      const tol = 0.28 * Math.min(pw, ph);
+      if (Math.abs(p.x - p.c * pw) < tol && Math.abs(p.y - p.r * ph) < tol) {
+        lockPiece(i);
+        updateProgress();
+        if (mode === 'community') { pending.add(i); sync(); }
+        if (edgesOnly && p.edge && !order.some(k => pieces[k].edge)) {
+          toast('Edges done. Turning the rest back on.');
+          setEdges(false);
+        }
+        checkDone();
+      }
+    }
+    save();
+    dirty = true;
+  }
+
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const [sx, sy] = localXY(e);
+    const [wx, wy] = toWorld(sx, sy);
+    view.z = clamp(view.z * Math.exp(-e.deltaY * 0.0015), minZ, maxZ);
+    view.ox = sx - wx * view.z; view.oy = sy - wy * view.z;
+    dirty = true;
+  }, { passive: false });
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- the community board ----------
+  function myName() {
+    const v = ($('who').value || '').trim();
+    return v || 'a guest';
+  }
+
+  async function sync() {
+    if (mode !== 'community' || syncing) return;
+    syncing = true;
+    const sent = [...pending];
+    try {
+      const res = sent.length
+        ? await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pieces: sent, who: myName() }) })
+        : await fetch(API, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      sent.forEach(i => pending.delete(i));
+      if (offline) toast(CFG.messages.online);
+      offline = false;
+      if (mode === 'community') applyServer(data);
+    } catch {
+      if (!offline) toast(CFG.messages.offline);
+      offline = true;
+    } finally {
+      syncing = false;
+      save();
+      // Pieces placed while this request was in flight go straight after it.
+      if (!offline && pending.size) setTimeout(sync, 0);
+    }
+  }
+
+  function applyServer(data) {
+    helpers = Array.isArray(data.helpers) ? data.helpers : [];
+    let arrived = 0;
+    for (const i of data.placed || []) {
+      const p = pieces[i];
+      if (!p || p.locked) continue;
+      if (drag.index === i) { drag.index = -1; canvas.classList.remove('dragging'); }
+      lockPiece(i);
+      arrived++;
+    }
+    if (arrived && lastCount >= 0) {
+      const who = data.last && data.last.who;
+      toast(arrived === 1 ? CFG.messages.oneArrived(who) : CFG.messages.manyArrived(arrived));
+    }
+    lastCount = (data.placed || []).length;
+    if (arrived) { updateProgress(); dirty = true; }
+    checkDone();
+  }
+
+  setInterval(() => { if (mode === 'community' && !document.hidden) sync(); }, 8000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
+
+  // ---------- state ----------
+  const placedCount = () => pieces.reduce((s, p) => s + (p.locked ? 1 : 0), 0);
+  function updateProgress() {
+    $('progress').innerHTML = mode === 'community'
+      ? `<b>${placedCount()}</b> / ${N} placed by everyone`
+      : `<b>${placedCount()}</b> / ${N} placed`;
+  }
+
+  function checkDone() {
+    if (finished || placedCount() !== N) return;
+    finished = true;
+    const helpersEl = $('done-helpers');
+    if (mode === 'community') {
+      $('done-sub').textContent = CFG.finish.communitySub;
+      const names = helpers.filter(h => h && h !== 'a guest');
+      const guests = helpers.includes('a guest');
+      if (names.length || guests) {
+        helpersEl.textContent = CFG.finish.helpersPrefix + ' ' + [...names, ...(guests ? [CFG.finish.unsignedGuests] : [])].join(', ') + '.';
+        helpersEl.hidden = false;
+      } else helpersEl.hidden = true;
+      $('another').textContent = 'Build my own copy';
+    } else {
+      $('done-sub').textContent = CFG.finish.ownSub;
+      helpersEl.hidden = true;
+      $('another').textContent = 'Try another size';
+    }
+    setTimeout(() => open('done'), 350);
+  }
+
+  let saveTimer = 0;
+  function save() {
+    clearTimeout(saveTimer);
+    const key = currentKey();
+    saveTimer = setTimeout(() => {
+      const state = { seed, order, pos: pieces.map(p => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, p.locked ? 1 : 0]) };
+      if (mode === 'community') state.pending = [...pending];
+      store.set(key, state);
+    }, 200);
+  }
+
+  let toastTimer = 0;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+  function open(id) { $(id).classList.add('open'); }
+  function close(id) { $(id).classList.remove('open'); }
+
+  function setEdges(on) {
+    edgesOnly = on; $('edges').setAttribute('aria-pressed', String(on)); dirty = true;
+  }
+
+  function start(choice, fresh) {
+    close('intro'); close('done');
+    mode = choice === 'community' ? 'community' : 'own';
+    const size = mode === 'community' ? 'community' : Number(choice);
+    const key = keyFor(choice);
+    if (fresh) store.del(key);
+    const saved = fresh ? null : store.get(key);
+    pending = new Set(mode === 'community' && saved && Array.isArray(saved.pending) ? saved.pending : []);
+    lastCount = -1;
+    build(size, saved);
+    store.set(STORE + 'last', choice);
+    save();
+    if (mode === 'community') sync();
+    dirty = true;
+  }
+
+  // ---------- controls ----------
+  $('size').addEventListener('change', e => start(e.target.value, false));
+  $('edges').addEventListener('click', () => setEdges(!edgesOnly));
+  $('ghost').addEventListener('click', () => { ghost = !ghost; $('ghost').setAttribute('aria-pressed', String(ghost)); dirty = true; });
+  $('scatter').addEventListener('click', () => { scatter(); fitView(); save(); });
+  $('fit').addEventListener('click', fitView);
+  $('restart').addEventListener('click', () => {
+    if (mode === 'community') {
+      scatter(); fitView(); save();
+      toast('Table tidied. Everything already placed stays placed.');
+    } else if (confirm('Start this size over? The pieces you have placed will be picked back up.')) {
+      start(String(N), true);
+    }
+  });
+  document.querySelectorAll('#intro [data-size]').forEach(b => b.addEventListener('click', () => start(b.dataset.size, false)));
+  $('admire').addEventListener('click', () => { close('done'); fitView(); });
+  $('another').addEventListener('click', () => { close('done'); open('intro'); });
+  $('who').value = store.get(STORE + 'who') || '';
+  $('who').addEventListener('change', () => store.set(STORE + 'who', $('who').value.trim()));
+
+  window.addEventListener('resize', resize);
+
+  // Test hook, only with #debug in the address: lets a tester find where a piece belongs.
+  if (location.hash === '#debug') {
+    window.__puzzle = {
+      screenOf: i => { const p = pieces[i]; return [p.x * view.z + view.ox + pw * view.z / 2, p.y * view.z + view.oy + ph * view.z / 2]; },
+      targetOf: i => { const p = pieces[i]; return [p.c * pw * view.z + view.ox + pw * view.z / 2, p.r * ph * view.z + view.oy + ph * view.z / 2]; },
+      loose: () => order.slice(), placed: placedCount, N: () => N, mode: () => mode, pending: () => [...pending],
+    };
+  }
+
+  // ---------- go ----------
+  img = new Image();
+  img.onload = () => {
+    W = img.naturalWidth; H = img.naturalHeight;
+    $('loading').remove();
+    resize();
+    const last = store.get(STORE + 'last');
+    if (last === 'community' || (last && GRIDS[last] && store.get(keyFor(last)))) {
+      start(last, false);
+      if (last !== 'community' && !finished) toast('Welcome back. Your pieces are where you left them.');
+    } else {
+      // First visit: the community board behind the welcome card.
+      mode = 'community';
+      build('community', store.get(keyFor('community')));
+      sync();
+      open('intro');
+    }
+    requestAnimationFrame(draw);
+  };
+  img.onerror = () => { $('loading').textContent = 'The postcard would not load. Try refreshing.'; };
+  img.src = IMG_SRC;
+})();
+</script>
+</body>
+</html>
